@@ -300,11 +300,31 @@ packet_id_display = {
     [state_type.Play]={
         [bound_type.Server]={
             [9]="Plugin Message",
+            [11]="Keep Alive",
+            [13]="Player Position",
+            [14]="Player Position And Look",
+            [29]="Animation",
+            [31]="Player Block Placement",
         },
         [bound_type.Client]={
+            [3]="Spawn Mob",
+            [11]="Block Change",
+            [20]="Window Items",
+            [22]="Set Slot",
             [24]="Plugin Message",
             [26]="Disconnect",
+            [32]="Chunk Data",
             [35]="Join Game",
+            [38]="Entity Relative Move",
+            [39]="Entity Look And Relative Move",
+            [50]="Destroy Entities",
+            [54]="Entity Head Look",
+            [60]="Entity Metadata",
+            [62]="Entity Velocity",
+            [63]="Entity Equipment",
+            [71]="Time Update",
+            [73]="Sound Effect",
+            [78]="Entity Properties",
         }
     },
     
@@ -329,6 +349,20 @@ fmlhs_display = {
     [-1]="HandshakeAck",
     [-2]="HandshakeReset",
 }
+fmlhs_phase_display = {
+    [bound_type.Client]={
+        [2]="WAITINGCACK",
+        [3]="COMPLETE",
+    },
+    [bound_type.Server]={
+        [2]="WAITINGSERVERDATA",
+        [3]="WAITINGSERVERCOMPLETE",
+        [4]="PENDINGCOMPLETE",
+        [5]="COMPLETE",
+    },
+    
+}
+
 
 fmlhs_type = {
     ServerHello = 0,
@@ -403,6 +437,12 @@ function minecraft_forge_protocol.dissector(buffer, pinfo, tree)
         -- print("---")
 
         local packet_length, shift, ok = buffer(offset):varint()
+        -- print('frame_id:'..tostring(get_frame_number()))
+        -- print('packet_length:'..tostring(packet_length))
+        -- pinfo.cols.info = 'packet_length:'..tostring(packet_length)
+        -- local subtreet = tree:add(minecraft_forge_protocol, buffer(offset), "Minecraft Forge Packet Test")
+
+        -- subtreet:add_le(protocol_fields.packet_length, buffer(offset, shift):proto(), packet_length)
         -- print(type(packet_length))
         -- print(tostring(packet_length))
         -- print("shift:"..shift)
@@ -426,7 +466,7 @@ function minecraft_forge_protocol.dissector(buffer, pinfo, tree)
         end
 
         pinfo.cols.protocol = minecraft_forge_protocol.name
-        local subtree = tree:add(minecraft_forge_protocol, buffer(), "Minecraft Forge Packet")
+        local subtree = tree:add(minecraft_forge_protocol, buffer(offset), "Minecraft Forge Packet")
 
         subtree:add_le(protocol_fields.packet_length, buffer(offset, shift):proto(), packet_length)
         offset = offset + shift
@@ -606,6 +646,8 @@ end
 function channel_server_client_fmlhs(pinfo,tree,buffer)
     local offset = 0
 
+    local state = get_conversation()
+
     tree:add_le(protocol_fields.plugin_channel_fmlhs_discriminator, buffer(offset,1):proto())
     local discriminator = buffer(offset,1):int()
     pinfo.cols.info = tostring(pinfo.cols.info) .." "..fmlhs_display[discriminator]..""
@@ -628,6 +670,12 @@ function channel_server_client_fmlhs(pinfo,tree,buffer)
         
     elseif discriminator == fmlhs_type.ModList then
     elseif discriminator == fmlhs_type.HandshakeAck then
+        local phase = buffer(offset,1):int()
+        tree:add_le(protocol_fields.plugin_channel_fmlhs_phase, buffer(offset,1):proto(),phase):append_text(" ("..fmlhs_phase_display[state.bound][phase]..")")
+        offset = offset + 1
+        pinfo.cols.info = tostring(pinfo.cols.info) .." = "..tostring(phase).."("..fmlhs_phase_display[state.bound][phase]..")"
+
+
     elseif discriminator == fmlhs_type.HandshakeReset then
     end
     
